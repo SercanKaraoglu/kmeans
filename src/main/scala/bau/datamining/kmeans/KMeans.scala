@@ -10,16 +10,17 @@ import scala.util.Random
 
 class KMeans(val seed: Int, val k: Int, val eta: Double, val species: Vector[Specy]) {
   val rand = new Random(seed)
+  val _species = species.par
   val means: ParArray[Specy] = (0 until k).map(_ => species(rand.nextInt(species.length))).to[ArrayBuffer].par
 
   import Helpers._
 
   private def kmeans(): ParArray[(Specy, ParVector[Specy])] = {
     @tailrec
-    def _kmeans(species: ParVector[Specy], means: ParArray[Specy], eta: Double): ParArray[(Specy, ParVector[Specy])] = {
+    def _kmeans(means: ParArray[Specy]): ParArray[(Specy, ParVector[Specy])] = {
       val newMeans: ParArray[(Specy, ParVector[Specy])] =
         means.map(mean => {
-          species.groupBy(p => means.minBy(_.distance(p))).get(mean) match {
+          _species.groupBy(p => means.minBy(_.distance(p))).get(mean) match {
             case Some(c) => (c.sum / c.length, c)
             case None => (mean, ParVector(mean))
           }
@@ -27,10 +28,10 @@ class KMeans(val seed: Int, val k: Int, val eta: Double, val species: Vector[Spe
       val converged = (means zip newMeans.map(_._1)).forall {
         case (oldMean, newMean) => oldMean.distance(newMean) <= eta
       }
-      if (!converged) _kmeans(species, newMeans.map(_._1), eta) else newMeans
+      if (!converged) _kmeans(newMeans.map(_._1)) else newMeans
     }
 
-    _kmeans(species.par, means, eta)
+    _kmeans(means)
   }
 }
 
